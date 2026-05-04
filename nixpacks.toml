@@ -1,0 +1,17 @@
+[phases.setup]
+nixPkgs = ["python312", "python312Packages.pip", "python312Packages.virtualenv", "postgresql"]
+
+[phases.install]
+cmds = [
+  "python -m venv /opt/venv",
+  ". /opt/venv/bin/activate && pip install --upgrade pip",
+  ". /opt/venv/bin/activate && pip install -r requirements.txt"
+]
+
+[phases.build]
+cmds = [
+  ". /opt/venv/bin/activate && python manage.py collectstatic --noinput"
+]
+
+[start]
+cmd = ". /opt/venv/bin/activate && python manage.py migrate --noinput && gunicorn agriripeness_api.wsgi:application --bind 0.0.0.0:$PORT --workers 4 --log-file -"

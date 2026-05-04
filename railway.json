@@ -1,0 +1,11 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS"
+  },
+  "deploy": {
+    "startCommand": "python manage.py migrate --noinput && python manage.py collectstatic --noinput && python manage.py create_superuser_if_missing && gunicorn agriripeness_api.wsgi:application --bind 0.0.0.0:$PORT --workers 4 --timeout 120 --log-file -",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  }
+}

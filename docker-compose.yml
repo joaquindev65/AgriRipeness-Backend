@@ -1,0 +1,117 @@
+# =============================================================================
+# AgriRipeness Backend - Docker Compose para Desarrollo Local
+# =============================================================================
+# Uso:
+#   docker-compose up -d          # Levantar servicios en background
+#   docker-compose up              # Levantar con logs visibles
+#   docker-compose logs -f web     # Ver logs del backend
+#   docker-compose down            # Detener servicios
+#   docker-compose down -v         # Detener y eliminar volúmenes (reset DB)
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL Database
+  # ---------------------------------------------------------------------------
+  postgres:
+    container_name: agriripeness_postgres
+    image: postgres:16.8-bookworm
+    environment:
+      POSTGRES_DB: ${DB_NAME:-agriripeness_db}
+      POSTGRES_USER: ${DB_USER:-agriripeness_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-agriripeness_pass}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-agriripeness_user} -d ${DB_NAME:-agriripeness_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - agriripeness_network
+
+  # ---------------------------------------------------------------------------
+  # Redis Cache (Opcional pero recomendado)
+  # ---------------------------------------------------------------------------
+  redis:
+    container_name: agriripeness_redis
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - agriripeness_network
+
+  # ---------------------------------------------------------------------------
+  # Django Backend (Desarrollo con hot-reload)
+  # ---------------------------------------------------------------------------
+  web:
+    container_name: agriripeness_web
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      # Montar código para hot-reload
+      - .:/app
+      # Excluir carpetas que no necesitan sincronización
+      - /app/__pycache__
+      - /app/.venv
+      - /app/staticfiles
+    environment:
+      # Django
+      DEBUG: "True"
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-secret-key-change-in-production}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0}
+
+      # Database (conecta al servicio postgres)
+      DB_NAME: ${DB_NAME:-agriripeness_db}
+      DB_USER: ${DB_USER:-agriripeness_user}
+      DB_PASSWORD: ${DB_PASSWORD:-agriripeness_pass}
+      DB_HOST: postgres
+      DB_PORT: 5432
+
+      # Cache (conecta al servicio redis)
+      REDIS_URL: redis://redis:6379/0
+
+      # Email (opcional para desarrollo)
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-noreply@agriripeness.local}
+      SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-admin@agriripeness.local}
+
+      # Frontend
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - agriripeness_network
+    # Reiniciar si falla
+    restart: unless-stopped
+
+# -----------------------------------------------------------------------------
+# Networks
+# -----------------------------------------------------------------------------
+networks:
+  agriripeness_network:
+    driver: bridge
+
+# -----------------------------------------------------------------------------
+# Volumes
+# -----------------------------------------------------------------------------
+volumes:
+  pgdata:
+    name: agriripeness_pgdata
+  redisdata:
+    name: agriripeness_redisdata

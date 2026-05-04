@@ -1,0 +1,1 @@
+web: python manage.py migrate && python manage.py create_superuser_if_missing && gunicorn agriripeness_api.wsgi --bind 0.0.0.0:$PORT --log-file -
