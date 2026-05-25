@@ -6,36 +6,32 @@ User = get_user_model()
 
 
 class Command(BaseCommand):
-    help = 'Create superuser from environment variables if not exists'
+    help = 'Create or update superuser from environment variables'
 
     def handle(self, *args, **options):
-        self.stdout.write('Starting create_superuser_if_missing command...')
-
         username = os.environ.get('DJANGO_SUPERUSER_USERNAME', 'admin')
         email = os.environ.get('DJANGO_SUPERUSER_EMAIL', 'admin@example.com')
         password = os.environ.get('DJANGO_SUPERUSER_PASSWORD')
 
-        self.stdout.write(f'Username: {username}')
-        self.stdout.write(f'Email: {email}')
-        self.stdout.write(f'Password set: {bool(password)}')
-
         if not password:
             self.stdout.write(self.style.ERROR(
-                'DJANGO_SUPERUSER_PASSWORD environment variable not set'
+                'DJANGO_SUPERUSER_PASSWORD not set — skipping'
             ))
             return
 
-        if User.objects.filter(username=username).exists():
-            self.stdout.write(self.style.WARNING(
-                f'Superuser "{username}" already exists'
-            ))
-            return
-
-        User.objects.create_superuser(
+        user, created = User.objects.get_or_create(
             username=username,
-            email=email,
-            password=password
+            defaults={'email': email, 'is_staff': True, 'is_superuser': True}
         )
-        self.stdout.write(self.style.SUCCESS(
-            f'Superuser "{username}" created successfully'
-        ))
+
+        # Siempre actualiza la contraseña y el email
+        user.set_password(password)
+        user.email = email
+        user.is_staff = True
+        user.is_superuser = True
+        user.save()
+
+        if created:
+            self.stdout.write(self.style.SUCCESS(f'Superuser "{username}" created'))
+        else:
+            self.stdout.write(self.style.SUCCESS(f'Superuser "{username}" password updated'))
