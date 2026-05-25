@@ -22,8 +22,8 @@ if "RAILWAY_STATIC_URL" in os.environ:
     RAILWAY_HOST = os.environ["RAILWAY_STATIC_URL"].replace("https://", "").replace("http://", "")
     ALLOWED_HOSTS.append(RAILWAY_HOST)
 ALLOWED_HOSTS.extend([
-    "*.railway.app",
-    "*.run.app",        # GCP Cloud Run
+    ".railway.app",
+    ".run.app",         # GCP Cloud Run (formato wildcard Django)
     "192.168.100.6",
     "192.168.1.158",
     "192.168.1.10",
