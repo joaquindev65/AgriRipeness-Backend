@@ -16,23 +16,23 @@ DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "t")
 # Seguridad
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-change-me-in-production-123456789")
 
-# ALLOWED_HOSTS para Railway
+# ALLOWED_HOSTS — soporta Railway, GCP Cloud Run y desarrollo local
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
-# Agregar Railway host dinámicamente
 if "RAILWAY_STATIC_URL" in os.environ:
     RAILWAY_HOST = os.environ["RAILWAY_STATIC_URL"].replace("https://", "").replace("http://", "")
     ALLOWED_HOSTS.append(RAILWAY_HOST)
 ALLOWED_HOSTS.extend([
     "*.railway.app",
+    "*.run.app",        # GCP Cloud Run
     "192.168.100.6",
     "192.168.1.158",
-    "192.168.1.10"
+    "192.168.1.10",
 ])
 
-# CSRF Trusted Origins
+# CSRF Trusted Origins — soporta Railway y GCP Cloud Run
 CSRF_TRUSTED_ORIGINS = os.environ.get(
     "CSRF_TRUSTED_ORIGINS",
-    "https://*.railway.app"
+    "https://*.railway.app,https://*.run.app"
 ).split(",")
 
 # Configuración de la base de datos - Railway provee DATABASE_URL automáticamente
@@ -49,16 +49,16 @@ DATABASES = {
     )
 }
 
-# CORS profesional
+# CORS — en DEBUG permite todo, en producción usa env var CORS_ALLOWED_ORIGINS
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
 else:
     CORS_ALLOW_ALL_ORIGINS = False
+    _cors_extra = os.environ.get("CORS_ALLOWED_ORIGINS", "")
     CORS_ALLOWED_ORIGINS = [
-        "https://agriripeness-ejbgh2a3cgbxf9a7.westus3-01.azurewebsites.net",
         "http://localhost:8081",
         "http://127.0.0.1:8081",
-    ]
+    ] + [origin for origin in _cors_extra.split(",") if origin]
 
 CORS_ALLOW_HEADERS = list(default_headers) + ["content-type"]
 
