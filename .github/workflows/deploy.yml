@@ -7,6 +7,7 @@ on:
 env:
   SERVICE: agriripeness-backend
   REGION: us-central1
+  PROJECT_ID: agriripenes
 
 jobs:
   deploy:
@@ -21,7 +22,7 @@ jobs:
       - name: Authenticate to GCP
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          credentials_json: ${{ secrets.AGRIRIPENES }}
 
       # Configurar gcloud CLI
       - name: Set up Cloud SDK
@@ -34,7 +35,7 @@ jobs:
       # Build y push de la imagen Docker
       - name: Build and push image
         run: |
-          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.SERVICE }}/${{ env.SERVICE }}:${{ github.sha }}"
+          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.SERVICE }}/${{ env.SERVICE }}:${{ github.sha }}"
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
           echo "IMAGE=$IMAGE" >> $GITHUB_ENV
