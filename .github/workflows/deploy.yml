@@ -1,4 +1,4 @@
-name: Deploy to GCP Cloud Run
+name: CI/CD Pipeline to GCP Cloud Run
 
 on:
   push:
@@ -10,29 +10,60 @@ env:
   PROJECT_ID: agriripenes
 
 jobs:
+  # --- NUEVO: Integración Continua (Tests) ---
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run Django Tests
+        env:
+          DJANGO_SECRET_KEY: test-key-only
+          # Usa sqlite para los tests en el pipeline
+          DATABASE_URL: sqlite:///db.sqlite3 
+        run: |
+          python manage.py test
+
+  # --- ACTUALIZADO: Despliegue Continuo ---
   deploy:
     name: Build and Deploy
+    needs: test # Solo despliega si los tests pasan
     runs-on: ubuntu-latest
+    
+    # Necesario para Workload Identity
+    permissions:
+      contents: 'read'
+      id-token: 'write'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Autenticación con GCP usando Service Account Key
+      # NUEVO: Autenticación con Workload Identity (Sin JSON Keys)
       - name: Authenticate to GCP
+        id: auth
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.AGRIRIPENES }}
+          workload_identity_provider: 'projects/605151724089/locations/global/workloadIdentityPools/github/providers/agriripenes-backend'
+          service_account: 'github-actions-deploy@agriripenes.iam.gserviceaccount.com'
 
-      # Configurar gcloud CLI
+
+
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      # Autorizar Docker para usar Artifact Registry
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
-      # Build y push de la imagen Docker
       - name: Build and push image
         run: |
           IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.SERVICE }}/${{ env.SERVICE }}:${{ github.sha }}"
@@ -40,10 +71,17 @@ jobs:
           docker push "$IMAGE"
           echo "IMAGE=$IMAGE" >> $GITHUB_ENV
 
-      # Deploy a Cloud Run
-      # Las variables de entorno sensibles (DATABASE_URL, SECRET_KEY, etc.)
-      # se configuran UNA SOLA VEZ desde la consola de GCP o con gcloud CLI.
-      # Este step solo actualiza la imagen en cada deploy.
+      # NUEVO: Ejecutar migraciones como un Cloud Run Job
+      - name: Run Database Migrations
+        run: |
+          gcloud run jobs update ${{ env.SERVICE }}-migrate \
+            --image "${{ env.IMAGE }}" \
+            --region ${{ env.REGION }} \
+            --command "python","manage.py","migrate","--noinput"
+          gcloud run jobs execute ${{ env.SERVICE }}-migrate \
+            --region ${{ env.REGION }} \
+            --wait
+
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ${{ env.SERVICE }} \

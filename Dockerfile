@@ -25,10 +25,8 @@ RUN DJANGO_SECRET_KEY=build-only-not-real \
 EXPOSE 8000
 
 # Ejecutar migraciones, crear superadmin y arrancar gunicorn
-CMD python manage.py migrate --noinput && \
-    python manage.py create_superuser_if_missing && \
-    gunicorn agriripeness_api.wsgi:application \
-        --bind 0.0.0.0:${PORT:-8000} \
-        --workers 2 \
-        --log-file - \
-        --access-logfile -
+CMD exec gunicorn agriripeness_api.wsgi:application \
+    --bind 0.0.0.0:${PORT:-8000} \
+    --workers 2 \
+    --log-file - \
+    --access-logfile -
