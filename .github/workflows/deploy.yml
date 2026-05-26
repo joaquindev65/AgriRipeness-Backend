@@ -77,10 +77,12 @@ jobs:
           gcloud run jobs update ${{ env.SERVICE }}-migrate \
             --image "${{ env.IMAGE }}" \
             --region ${{ env.REGION }} \
-            --command "python","manage.py","migrate","--noinput"
+            --command "python" \
+            --args "manage.py,migrate,--noinput"
           gcloud run jobs execute ${{ env.SERVICE }}-migrate \
             --region ${{ env.REGION }} \
             --wait
+      
 
       - name: Deploy to Cloud Run
         run: |
