@@ -40,6 +40,9 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8001:8000"
+    volumes:
+      - .:/app
+      - static_volume:/app/staticfiles
     environment:
       DEBUG: ${DEBUG:-False}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Se requiere DJANGO_SECRET_KEY}
@@ -73,3 +76,4 @@ volumes:
     name: agriripeness_pgdata
   redisdata:
     name: agriripeness_redisdata
+  static_volume:
