@@ -1,20 +1,6 @@
-# =============================================================================
-# AgriRipeness Backend - Docker Compose para Desarrollo Local
-# =============================================================================
-# Uso:
-#   docker-compose up -d          # Levantar servicios en background
-#   docker-compose up              # Levantar con logs visibles
-#   docker-compose logs -f web     # Ver logs del backend
-#   docker-compose down            # Detener servicios
-#   docker-compose down -v         # Detener y eliminar volúmenes (reset DB)
-# =============================================================================
-
 services:
-  # ---------------------------------------------------------------------------
-  # PostgreSQL Database
-  # ---------------------------------------------------------------------------
-  postgres:
-    container_name: agriripeness_postgres
+  db:
+    container_name: agriripeness_db
     image: postgres:16.8-bookworm
     environment:
       POSTGRES_DB: ${DB_NAME:-agriripeness_db}
@@ -32,9 +18,6 @@ services:
     networks:
       - agriripeness_network
 
-  # ---------------------------------------------------------------------------
-  # Redis Cache (Opcional pero recomendado)
-  # ---------------------------------------------------------------------------
   redis:
     container_name: agriripeness_redis
     image: redis:7-alpine
@@ -50,66 +33,42 @@ services:
     networks:
       - agriripeness_network
 
-  # ---------------------------------------------------------------------------
-  # Django Backend (Desarrollo con hot-reload)
-  # ---------------------------------------------------------------------------
   web:
     container_name: agriripeness_web
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
-    volumes:
-      # Montar código para hot-reload
-      - .:/app
-      # Excluir carpetas que no necesitan sincronización
-      - /app/__pycache__
-      - /app/.venv
-      - /app/staticfiles
+      - "8001:8000"
     environment:
-      # Django
-      DEBUG: "True"
-      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-secret-key-change-in-production}
-      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0}
-
-      # Database (conecta al servicio postgres)
-      DB_NAME: ${DB_NAME:-agriripeness_db}
-      DB_USER: ${DB_USER:-agriripeness_user}
-      DB_PASSWORD: ${DB_PASSWORD:-agriripeness_pass}
-      DB_HOST: postgres
-      DB_PORT: 5432
-
-      # Cache (conecta al servicio redis)
+      DEBUG: ${DEBUG:-False}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Se requiere DJANGO_SECRET_KEY}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
+      DATABASE_URL: postgresql://${DB_USER:-agriripeness_user}:${DB_PASSWORD:-agriripeness_pass}@db:5432/${DB_NAME:-agriripeness_db}
       REDIS_URL: redis://redis:6379/0
-
-      # Email (opcional para desarrollo)
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-}
       SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-noreply@agriripeness.local}
       SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-admin@agriripeness.local}
-
-      # Frontend
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+    command: >
+      sh -c "
+        python manage.py migrate --noinput &&
+        python manage.py create_superuser_if_missing &&
+        gunicorn agriripeness_api.wsgi:application --bind 0.0.0.0:8000 --workers 2 --log-file - --access-logfile -
+      "
     depends_on:
-      postgres:
+      db:
         condition: service_healthy
-      redis:
-        condition: service_healthy
+    restart: unless-stopped
     networks:
       - agriripeness_network
-    # Reiniciar si falla
-    restart: unless-stopped
 
-# -----------------------------------------------------------------------------
-# Networks
-# -----------------------------------------------------------------------------
 networks:
   agriripeness_network:
     driver: bridge
 
-# -----------------------------------------------------------------------------
-# Volumes
-# -----------------------------------------------------------------------------
 volumes:
   pgdata:
     name: agriripeness_pgdata

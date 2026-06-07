@@ -29,6 +29,9 @@ ALLOWED_HOSTS.extend([
     "192.168.1.10",
 ])
 
+# Proxy reverso (Nginx/ALB) — confiar en X-Forwarded-Proto para detectar HTTPS
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 # CSRF Trusted Origins — soporta Railway y GCP Cloud Run
 CSRF_TRUSTED_ORIGINS = os.environ.get(
     "CSRF_TRUSTED_ORIGINS",
