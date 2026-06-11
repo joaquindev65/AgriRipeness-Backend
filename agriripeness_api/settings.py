@@ -59,8 +59,10 @@ else:
     CORS_ALLOW_ALL_ORIGINS = False
     _cors_extra = os.environ.get("CORS_ALLOWED_ORIGINS", "")
     CORS_ALLOWED_ORIGINS = [
-        "http://localhost:8081",
-        "http://127.0.0.1:8081",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
     ] + [origin for origin in _cors_extra.split(",") if origin]
 
 CORS_ALLOW_HEADERS = list(default_headers) + ["content-type"]

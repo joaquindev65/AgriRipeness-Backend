@@ -881,13 +881,13 @@ class WorkerCreateSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'date_joined', 'api_key', 'is_active', 'password_change_required', 'email_sent']
         extra_kwargs = {
-            'email': {'required': True, 'allow_blank': False},
+            'email': {'required': False, 'allow_blank': True, 'default': ''},
             'first_name': {'required': True, 'allow_blank': False},
         }
 
     def validate_email(self, value):
-        """Valida que el email sea único"""
-        if User.objects.filter(email=value).exists():
+        """Valida que el email sea único (si se proporciona)"""
+        if value and User.objects.filter(email=value).exists():
             raise serializers.ValidationError("Ya existe un usuario con este email.")
         return value
     
@@ -914,14 +914,15 @@ class WorkerCreateSerializer(serializers.ModelSerializer):
         
         # Generar password temporal
         temp_password = generate_temp_password()
-        logger.info(f"🔄 Creando worker con email: {validated_data['email']}")
+        email = validated_data.get('email', '') or ''
+        logger.info(f"🔄 Creando worker con email: {email or '(sin email)'}")
         
         # Crear usuario CON password temporal
         user = User.objects.create_user(
-            username=validated_data.get('username', validated_data['email'].split('@')[0]),
+            username=validated_data.get('username', email.split('@')[0] if email else f"worker_{validated_data['first_name'].lower()}"),
             first_name=validated_data['first_name'],
             last_name=validated_data.get('last_name', ''),
-            email=validated_data['email'],
+            email=email,
             password=temp_password,  # Password temporal hasheado
             is_staff=False,  # Workers NO son staff
             is_active=True,
@@ -943,19 +944,23 @@ class WorkerCreateSerializer(serializers.ModelSerializer):
         api_key_obj, plain_key = WorkerAPIKey.create_key(user=user, name=api_key_name)
         logger.info(f"✅ API Key generada: {plain_key[:20]}...")
 
-        # Enviar email con credenciales
-        logger.info(f"📧 Enviando email con credenciales a {user.email}")
-        email_sent = send_worker_credentials_email(
-            worker_email=user.email,
-            first_name=user.first_name,
-            temp_password=temp_password,  # Password en texto plano (solo para email)
-            api_key=plain_key
-        )
-        
-        if email_sent:
-            logger.info(f"✅ Email enviado exitosamente a {user.email}")
+        # Enviar email con credenciales (solo si hay email)
+        email_sent = False
+        if user.email:
+            logger.info(f"📧 Enviando email con credenciales a {user.email}")
+            email_sent = send_worker_credentials_email(
+                worker_email=user.email,
+                first_name=user.first_name,
+                temp_password=temp_password,  # Password en texto plano (solo para email)
+                api_key=plain_key
+            )
+            
+            if email_sent:
+                logger.info(f"✅ Email enviado exitosamente a {user.email}")
+            else:
+                logger.error(f"❌ FALLO al enviar email a {user.email}")
         else:
-            logger.error(f"❌ FALLO al enviar email a {user.email}")
+            logger.info(f"ℹ️ Sin email configurado, saltando envío de credenciales")
 
         # Agregar atributos temporales para la respuesta
         user.api_key = plain_key
