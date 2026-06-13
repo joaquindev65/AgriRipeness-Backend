@@ -654,57 +654,12 @@ class AnalysisRecordViewSet(viewsets.ModelViewSet):
         print(f"Creating record with total_lemons_count: {data.get('total_lemons_count')}")
         print(f"User for creation: {request.user.id if request.user.is_authenticated else 'Anonymous'}")
         
-        # 🚨 DEBUG TEMPORAL: Verificar datos finales antes del serializer
-        debug_info = f"\nFINAL DATA CHECK BEFORE SERIALIZER (Record creation):\n"
-        debug_info += f"   - analysis_metadata type: {type(data.get('analysis_metadata'))}\n"
-        debug_info += f"   - analysis_metadata value: {data.get('analysis_metadata')}\n"
-        debug_info += f"   - detected_lemons type: {type(data.get('detected_lemons'))}\n"
-        debug_info += f"   - detected_lemons value: {data.get('detected_lemons')}\n"
-        
-        # Escribir a archivo para debug
-        try:
-            with open('debug_views.log', 'a', encoding='utf-8') as f:
-                f.write(f"\n{'='*50}\n")
-                f.write(f"TIMESTAMP: {timezone.now()}\n")
-                f.write(debug_info)
-                f.write(f"   - All data keys: {list(data.keys())}\n")
-                f.write(f"{'='*50}\n\n")
-        except Exception as e:
-            print(f"Error writing debug log: {e}")
-        
-        print(debug_info)
-        
-        # 🚨 TEMPORAL FIX: Si los campos JSON están vacíos, forzar datos de prueba
-        if not data.get('analysis_metadata') or not data.get('detected_lemons'):
-            print(f"FORCING JSON DATA FOR DEBUGGING")
-            if not data.get('analysis_metadata'):
-                data['analysis_metadata'] = {
-                    'detection_boxes': [
-                        {'bbox': [10, 20, 50, 60], 'confidence': 0.9, 'class': 'lemon'},
-                        {'bbox': [70, 80, 110, 120], 'confidence': 0.8, 'class': 'lemon'}
-                    ],
-                    'image_size': [200, 200],
-                    'model_version': 'forced_debug'
-                }
-            if not data.get('detected_lemons'):
-                data['detected_lemons'] = [
-                    {'id': 1, 'bbox': [10, 20, 50, 60], 'confidence': 0.9, 'ripeness': 'ripe'},
-                    {'id': 2, 'bbox': [70, 80, 110, 120], 'confidence': 0.8, 'ripeness': 'semi_ripe'}
-                ]
-            print(f"- Forced analysis_metadata: {data['analysis_metadata']}")
-            print(f"- Forced detected_lemons: {data['detected_lemons']}")
-        
         # Crear el registro usando el serializer
         serializer = self.get_serializer(data=data)
         
         try:
             # Validar el serializer
             if not serializer.is_valid():
-                print(f"SERIALIZER VALIDATION ERRORS:")
-                for field, errors in serializer.errors.items():
-                    print(f"- {field}: {errors}")
-
-                # ========== LOGGING DE SINCRONIZACIÓN - ERROR DE VALIDACIÓN ==========
                 sync_logger.error(f"[{correlation_id}] ❌ ERROR DE VALIDACIÓN")
                 for field, errors in serializer.errors.items():
                     sync_logger.error(f"[{correlation_id}]    - {field}: {errors}")
@@ -714,16 +669,6 @@ class AnalysisRecordViewSet(viewsets.ModelViewSet):
                     'error': 'Validation failed',
                     'details': serializer.errors
                 }, status=status.HTTP_400_BAD_REQUEST)
-            
-            # DEBUG: Verificar datos justo antes de guardar
-            print(f"\nPRE-SAVE DEBUG:")
-            print(f"- Serializer validated_data keys: {list(serializer.validated_data.keys())}")
-            for field in ['analysis_metadata', 'detected_lemons']:
-                if field in serializer.validated_data:
-                    value = serializer.validated_data[field]
-                    print(f"- {field}: {type(value)} = {value}")
-                else:
-                    print(f"- {field}: NOT IN VALIDATED_DATA")
             
             # Guardar la instancia con el usuario autenticado
             instance = serializer.save(user=self.request.user)
@@ -864,16 +809,6 @@ class AnalysisRecordViewSet(viewsets.ModelViewSet):
                 'error': f'Server error: {str(e)}',
                 'type': type(e).__name__
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-def perform_create(self, serializer):
-    """Asigna automáticamente el usuario autenticado al crear un nuevo registro."""
-    serializer.save(user=self.request.user)
-
-def get_serializer_context(self):
-    """Añade contexto adicional al serializer incluyendo el request."""
-    context = super().get_serializer_context()
-    context['request'] = self.request
-    return context
 
 @action(detail=False, methods=['get'], url_path='sync-health', permission_classes=[AllowAny])
 def sync_health(self, request):

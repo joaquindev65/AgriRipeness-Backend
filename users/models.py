@@ -467,28 +467,6 @@ class AnalysisRecord(models.Model):
         except Exception:
             pass
         return None
-    
-    @property
-    def confidence_score(self):
-        """
-        Retorna el score de confianza del análisis.
-        """
-        return self.analysis_data.get('confidence', 0)
-    
-    @property
-    def predicted_class(self):
-        """
-        Retorna la clase predicha del análisis.
-        """
-        return self.analysis_data.get('predicted_class', 'unknown')
-    
-    def get_analysis_summary(self):
-        """
-        Retorna un resumen del análisis en formato legible.
-        """
-        confidence = self.confidence_score
-        predicted_class = self.predicted_class
-        return f"{predicted_class.title()} (Confianza: {confidence:.2%})"
 
 
 class PasswordResetToken(models.Model):

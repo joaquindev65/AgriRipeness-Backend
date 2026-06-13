@@ -95,88 +95,33 @@ class JSONStringField(serializers.JSONField):
         super().__init__(*args, **kwargs)
     
     def to_internal_value(self, data):
-        # Obtener nombre del campo para debug específico
         field_name = getattr(self, 'field_name', getattr(self, 'source', 'unknown_field'))
         
-        debug_info = f"JSONStringField[{field_name}].to_internal_value: {type(data)} = {str(data)[:200]}..."
-        print(debug_info)
-        
-        # Debug file específico para JSONStringField
-        try:
-            with open('debug_jsonfield.log', 'a', encoding='utf-8') as f:
-                from django.utils import timezone
-                f.write(f"{timezone.now()}: {debug_info}\n")
-        except:
-            pass
-        
         if data is None or data == '':
-            print(f"- [{field_name}] Returning default for empty data")
             return self.default_value if self.default_value is not None else {}
             
-        # DETECCIÓN ESPECIAL: Django REST Framework JSONString object
-        data_str = str(data)  # Convertir a string sin importar el tipo
+        data_str = str(data)
         
         if isinstance(data, str) or 'JSONString' in str(type(data)):
             try:
                 import json
                 parsed = json.loads(data_str)
-                print(f"- [{field_name}] Successfully parsed JSON: {type(parsed)} with {len(str(parsed))} chars")
-                # Debug file con resultado exitoso
-                try:
-                    with open('debug_jsonfield.log', 'a', encoding='utf-8') as f:
-                        f.write(f"   SUCCESS: Parsed to {type(parsed)} with content: {str(parsed)[:100]}...\n")
-                except:
-                    pass
                 return parsed
-            except (json.JSONDecodeError, TypeError) as e:
-                print(f"- [{field_name}] JSON parse error: {e}")
-                
-                # ARREGLO ESPECÍFICO: Detectar Python dict/list strings y convertirlos
-                print(f"- [{field_name}] Attempting Python literal evaluation...")
+            except (json.JSONDecodeError, TypeError):
                 try:
                     import ast
-                    # Usar ast.literal_eval que es seguro para evaluar literales de Python
                     parsed = ast.literal_eval(data_str)
-                    print(f"- [{field_name}] SUCCESS with ast.literal_eval: {type(parsed)}")
-                    # Debug file con éxito de AST
-                    try:
-                        with open('debug_jsonfield.log', 'a', encoding='utf-8') as f:
-                            f.write(f"   AST SUCCESS: Parsed to {type(parsed)} with content: {str(parsed)[:100]}...\n")
-                    except:
-                        pass
                     return parsed
-                except (ValueError, SyntaxError) as ast_error:
-                    print(f"- [{field_name}] AST parse also failed: {ast_error}")
-                    # Debug file con error de AST
-                    try:
-                        with open('debug_jsonfield.log', 'a', encoding='utf-8') as f:
-                            f.write(f"   ERROR: Both JSON and AST failed\n")
-                            f.write(f"   JSON error: {e}\n")
-                            f.write(f"   AST error: {ast_error}\n")
-                            f.write(f"   Raw data: {repr(data_str[:200])}\n")
-                    except:
-                        pass
+                except (ValueError, SyntaxError):
+                    if field_name == 'analysis_metadata':
+                        return {}
+                    elif field_name == 'detected_lemons':
+                        return []
+                    return self.default_value if self.default_value is not None else {}
                 
-                # Si ambos métodos fallan, devolver valor por defecto
-                if field_name == 'analysis_metadata':
-                    return {}
-                elif field_name == 'detected_lemons':
-                    return []
-                return self.default_value if self.default_value is not None else {}
-                
-        # Si ya es dict/list, devolverlo tal como está
         if isinstance(data, (dict, list)):
-            print(f"- [{field_name}] Data already parsed: {type(data)} with {len(data) if hasattr(data, '__len__') else 'N/A'} items")
-            # Debug file con éxito de dict/list
-            try:
-                with open('debug_jsonfield.log', 'a', encoding='utf-8') as f:
-                    f.write(f"   PASSTHROUGH: {type(data)} with content: {str(data)[:100]}...\n")
-            except:
-                pass
             return data
             
-        # Para cualquier otro tipo, usar superclase
-        print(f"- [{field_name}] Using superclass for type: {type(data)}")
         return super().to_internal_value(data)
 
 class AnalysisRecordSerializer(serializers.ModelSerializer):
@@ -317,82 +262,42 @@ class AnalysisRecordSerializer(serializers.ModelSerializer):
     
     def validate_analysis_metadata(self, value):
         """Valida que los metadatos sean un diccionario válido o JSON string."""
-        # Debug para capturar el problema
-        debug_info = f"VALIDATE_ANALYSIS_METADATA: {type(value)} = {value}"
-        print(debug_info)
-        
-        try:
-            with open('debug_validation.log', 'a', encoding='utf-8') as f:
-                from django.utils import timezone
-                f.write(f"{timezone.now()}: {debug_info}\n")
-        except:
-            pass
-            
-        # Casos explícitos para evitar problemas
         if value is None:
-            print(f"- Value is None, returning empty dict")
             return {}
             
         if value == "":
-            print(f"- Value is empty string, returning empty dict")
             return {}
             
-        # Si es string, intentar parsearlo como JSON
         if isinstance(value, str):
             try:
                 import json
                 parsed = json.loads(value)
-                print(f"- Parsed JSON from string: {parsed}")
                 return parsed
-            except json.JSONDecodeError as e:
-                print(f"- JSON parse error: {e}, returning empty dict")
+            except json.JSONDecodeError:
                 return {}
                 
-        # Si ya es dict, retornarlo tal como está
         if isinstance(value, dict):
-            print(f"- Value is dict with {len(value)} keys, returning as-is")
             return value
             
-        # Para cualquier otro tipo, convertir a dict vacío
-        print(f"- Unexpected type {type(value)}, returning empty dict")
         return {}
         
     def validate_detected_lemons(self, value):
         """Valida que las detecciones sean una lista válida o JSON string."""
-        # Debug para capturar el problema
-        debug_info = f"VALIDATE_DETECTED_LEMONS: {type(value)} = {value}"
-        print(debug_info)
-        
-        try:
-            with open('debug_validation.log', 'a', encoding='utf-8') as f:
-                from django.utils import timezone
-                f.write(f"{timezone.now()}: {debug_info}\n")
-        except:
-            pass
-            
-        # Casos explícitos para evitar problemas
         if value is None:
-            print(f"- Value is None, returning empty list")
             return []
             
         if value == "":
-            print(f"- Value is empty string, returning empty list")
             return []
             
-        # Si es string, intentar parsearlo como JSON
         if isinstance(value, str):
             try:
                 import json
                 parsed = json.loads(value)
-                print(f"- Parsed JSON from string: {parsed}")
                 return parsed if isinstance(parsed, list) else []
-            except json.JSONDecodeError as e:
-                print(f"- JSON parse error: {e}, returning empty list")
+            except json.JSONDecodeError:
                 return []
                 
-        # Si ya es list, retornarlo tal como está
         if isinstance(value, list):
-            print(f"- Value is list with {len(value)} items, returning as-is")
             return value
             
         # Para cualquier otro tipo, convertir a lista vacía
